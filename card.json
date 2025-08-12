@@ -51,7 +51,7 @@
             "elements": [
               {
                 "tag": "markdown",
-                "content": "[COMMIT_RAW](COMMIT_URL)",
+                "content": "[COMMIT_RAW](COMMIT__URL)",
                 "text_align": "left"
               }
             ]
@@ -83,7 +83,7 @@
             "elements": [
               {
                 "tag": "markdown",
-                "content": "[USER_RAW](USER_URL)"
+                "content": "[USER_RAW](USER__URL)"
               }
             ]
           },
@@ -191,7 +191,7 @@
             "elements": [
               {
                 "tag": "markdown",
-                "content": "[COMMIT_RAW](COMMIT_URL)",
+                "content": "[COMMIT_RAW](COMMIT__URL)",
                 "text_align": "left"
               }
             ]
@@ -223,7 +223,7 @@
             "elements": [
               {
                 "tag": "markdown",
-                "content": "[USER_RAW](USER_URL)"
+                "content": "[USER_RAW](USER__URL)"
               }
             ]
           },

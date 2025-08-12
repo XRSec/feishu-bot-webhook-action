@@ -29970,230 +29970,6 @@ const github_1 = __nccwpck_require__(3228);
 const https = __importStar(__nccwpck_require__(5692));
 const crypto = __importStar(__nccwpck_require__(6982));
 const child = __importStar(__nccwpck_require__(5317));
-const FEISHU_ICONS = {
-    SUCCESS: { tag: "standard_icon", token: "success_outlined", color: "green" },
-    ERROR: { tag: "standard_icon", token: "error_outlined", color: "red" },
-    WARNING: { tag: "standard_icon", token: "warning_outlined", color: "orange" },
-    INFO: { tag: "standard_icon", token: "info_outlined", color: "blue" },
-    CHAT: { tag: "standard_icon", token: "chat_outlined", color: "blue" },
-    NOTIFICATION: { tag: "standard_icon", token: "notification_outlined", color: "orange" },
-    SETTINGS: { tag: "standard_icon", token: "settings_outlined", color: "gray" },
-    LINK: { tag: "standard_icon", token: "link_outlined", color: "blue" },
-    CODE: { tag: "standard_icon", token: "code_outlined", color: "purple" },
-    GIT: { tag: "standard_icon", token: "git_outlined", color: "orange" },
-    BUILD: { tag: "standard_icon", token: "build_outlined", color: "green" },
-    DEPLOY: { tag: "standard_icon", token: "deploy_outlined", color: "blue" },
-    DOC: { tag: "standard_icon", token: "doc_outlined", color: "blue" },
-    FOLDER: { tag: "standard_icon", token: "folder_outlined", color: "yellow" },
-    FILE: { tag: "standard_icon", token: "file_outlined", color: "gray" },
-};
-function processMarkdownContent(markdownText, options = {}) {
-    let processed = markdownText;
-    processed = cleanMarkdownSyntax(processed);
-    if (options.enableAtParsing !== false) {
-        processed = processAtMentions(processed);
-    }
-    if (options.enableEmojiParsing !== false) {
-        processed = processEmojis(processed);
-    }
-    if (options.enableLinkParsing !== false) {
-        processed = processLinks(processed);
-    }
-    return processed;
-}
-function cleanMarkdownSyntax(text) {
-    return text
-        .replace(/\r\n/g, '\n')
-        .replace(/\r/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .replace(/ +$/gm, '')
-        .replace(/^[ \t]*[\*\+\-][ \t]/gm, '- ')
-        .replace(/^[ \t]*(\d+)\.[ \t]/gm, '$1. ')
-        .replace(/```(\w*)\n/g, '```$1\n')
-        .replace(/^[ \t]*>[ \t]?/gm, '> ')
-        .replace(/\*\*([^*]+)\*\*/g, '**$1**')
-        .replace(/\*([^*]+)\*/g, '*$1*')
-        .replace(/__([^_]+)__/g, '**$1**')
-        .replace(/_([^_]+)_/g, '*$1*')
-        .replace(/~~([^~]+)~~/g, '~~$1~~')
-        .replace(/`([^`]+)`/g, '`$1`');
-}
-function processAtMentions(text) {
-    return text
-        .replace(/@all\b/g, '<at id=all></at>')
-        .replace(/@([a-zA-Z0-9_-]+)(?!@|[a-zA-Z0-9.-]*\.[a-zA-Z]{2,})/g, '<at id=$1></at>')
-        .replace(/<at id=([^>]+)><\/at>/g, '<at id=$1></at>');
-}
-function processEmojis(text) {
-    return text
-        .replace(/:([a-zA-Z0-9_+-]+):/g, ':$1:')
-        .replace(/([\uD83C-\uDBFF][\uDC00-\uDFFF]|[\u2600-\u27FF]|[\uD83C][\uDF00-\uDFFF]|[\uD83D][\uDC00-\uDE4F]|[\uD83D][\uDE80-\uDEFF])/g, '$1');
-}
-function processLinks(text) {
-    let processed = text;
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    const existingLinks = [];
-    let match;
-    while ((match = linkRegex.exec(text)) !== null) {
-        existingLinks.push(match[0]);
-    }
-    processed = processed.replace(/(^|[^(\[])(https?:\/\/[^\s<>()[\]{}]+)([^)\]]|$)/g, (fullMatch, before, url, after) => {
-        const isInExistingLink = existingLinks.some(link => link.includes(url));
-        if (isInExistingLink) {
-            return fullMatch;
-        }
-        return `${before}[${url}](${url})${after}`;
-    });
-    processed = processed.replace(/(^|[^(\[]|[^@])([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})([^)\]]|$)/g, (fullMatch, before, email, after) => {
-        if (before.includes('](') || after.includes(')') || fullMatch.includes('](')) {
-            return fullMatch;
-        }
-        return `${before}[${email}](mailto:${email})${after}`;
-    });
-    return processed;
-}
-function extractLinksForHref(text) {
-    const href = {};
-    const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-    let match;
-    let linkIndex = 0;
-    while ((match = linkRegex.exec(text)) !== null) {
-        const [, linkText, url] = match;
-        const linkKey = `link_${linkIndex++}`;
-        href[linkKey] = {
-            url: url,
-            pc_url: url,
-            ios_url: url,
-            android_url: url
-        };
-    }
-    return href;
-}
-function buildMarkdownElement(mdText, options = {}) {
-    const processedContent = processMarkdownContent(mdText, options);
-    const element = {
-        tag: "markdown",
-        content: processedContent,
-    };
-    if (options.text_size) {
-        element.text_size = options.text_size;
-    }
-    if (options.text_align) {
-        element.text_align = options.text_align;
-    }
-    if (options.icon) {
-        element.icon = options.icon;
-    }
-    if (!options.href) {
-        const extractedHref = extractLinksForHref(processedContent);
-        if (Object.keys(extractedHref).length > 0) {
-            element.href = extractedHref;
-        }
-    }
-    else {
-        element.href = options.href;
-    }
-    return element;
-}
-function buildFeishuMarkdownCard(title, mdText, options = {}) {
-    const markdownElement = buildMarkdownElement(mdText, {
-        text_size: "normal",
-        text_align: "left",
-        icon: {
-            tag: "standard_icon",
-            token: "chat-forbidden_outlined",
-            color: "orange",
-        },
-        ...options
-    });
-    return {
-        msg_type: "interactive",
-        card: {
-            header: {
-                template: "blue",
-                title: {
-                    tag: "plain_text",
-                    content: title,
-                },
-            },
-            elements: [markdownElement],
-        },
-    };
-}
-function buildI18nFeishuMarkdownCard(title, mdText, options = {}) {
-    const processedContent = processMarkdownContent(mdText, options);
-    return {
-        msg_type: "interactive",
-        card: {
-            header: {
-                template: "blue",
-                title: {
-                    tag: "plain_text",
-                    content: title,
-                },
-            },
-            i18n_elements: {
-                zh_cn: [
-                    buildMarkdownElement(processedContent, options)
-                ],
-                en_us: [
-                    buildMarkdownElement(processedContent, options)
-                ]
-            }
-        },
-    };
-}
-function createSuccessCard(title, message, options = {}) {
-    return buildFeishuMarkdownCard(title, message, {
-        icon: FEISHU_ICONS.SUCCESS,
-        ...options
-    });
-}
-function createErrorCard(title, message, options = {}) {
-    return buildFeishuMarkdownCard(title, message, {
-        icon: FEISHU_ICONS.ERROR,
-        ...options
-    });
-}
-function createWarningCard(title, message, options = {}) {
-    return buildFeishuMarkdownCard(title, message, {
-        icon: FEISHU_ICONS.WARNING,
-        ...options
-    });
-}
-function createInfoCard(title, message, options = {}) {
-    return buildFeishuMarkdownCard(title, message, {
-        icon: FEISHU_ICONS.INFO,
-        ...options
-    });
-}
-function validateMarkdownForFeishu(content) {
-    const warnings = [];
-    const errors = [];
-    if (content.length > 10000) {
-        errors.push("内容长度超过 10000 字符，可能导致显示问题");
-    }
-    const unsupportedTags = /<(script|style|iframe|form|input|button)[^>]*>/gi;
-    if (unsupportedTags.test(content)) {
-        warnings.push("内容包含不支持的 HTML 标签，将被忽略");
-    }
-    const imageLinks = /!\[([^\]]*)\]\(([^)]+)\)/g;
-    let imageMatch;
-    while ((imageMatch = imageLinks.exec(content)) !== null) {
-        const imageUrl = imageMatch[2];
-        if (!imageUrl.startsWith('http')) {
-            warnings.push(`图片链接 "${imageUrl}" 不是完整的 URL，可能无法显示`);
-        }
-    }
-    if (content.includes('|') && content.includes('---')) {
-        warnings.push("检测到表格语法，飞书卡片对表格支持有限，建议使用列表代替");
-    }
-    return {
-        valid: errors.length === 0,
-        warnings,
-        errors
-    };
-}
 function execTrim(cmd) {
     try {
         return child.execSync(cmd, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim();
@@ -30204,7 +29980,7 @@ function execTrim(cmd) {
 }
 function sign_with_timestamp(timestamp, secret) {
     const message = `${timestamp}\n${secret}`;
-    return crypto.createHmac('SHA256', message).digest('base64');
+    return crypto.createHmac('SHA256', secret).update(message).digest('base64');
 }
 function buildInteractiveCardPayload(card) {
     return JSON.stringify({ msg_type: 'interactive', card });
@@ -30364,32 +30140,13 @@ async function run() {
             return;
         }
         if (msgTextInput) {
-            const validation = validateMarkdownForFeishu(msgTextInput);
-            if (validation.warnings.length > 0) {
-                validation.warnings.forEach(warning => core.warning(warning));
-            }
-            if (!validation.valid) {
-                validation.errors.forEach(error => core.error(error));
-                core.setFailed('Markdown 内容验证失败');
-                return;
-            }
-            const markdownOptions = {
-                text_size: "normal",
-                text_align: "left",
-                enableAtParsing: true,
-                enableEmojiParsing: true,
-                enableLinkParsing: true
-            };
-            const processedContent = processMarkdownContent(msgTextInput, markdownOptions);
             const postCard = {
-                i18n_elements: {
-                    zh_cn: [
-                        buildMarkdownElement(processedContent, markdownOptions)
-                    ],
-                    en_us: [
-                        buildMarkdownElement(processedContent, markdownOptions)
-                    ]
-                }
+                elements: [
+                    {
+                        tag: "markdown",
+                        content: msgTextInput
+                    }
+                ]
             };
             if (dry) {
                 core.info('DRY RUN: final markdown card JSON:');
@@ -30411,7 +30168,7 @@ async function run() {
             core.info(`Sent markdown card to Feishu, HTTP status: ${statusCode}`);
             return;
         }
-        const template = { "i18n_elements": { "zh_cn": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**分支：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "branch_raw", "tag": "plain_text" } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**ID：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "commit_raw", "text_align": "left", "href": { "commit_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "commit_url_value" } } }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**用户：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "user_raw", "href": { "user_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "user_url_value" } } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**状态：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "status_raw", "tag": "plain_text" } }] }] }, { "tag": "markdown", "content": "msg_raw" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "查看详情" }, "type": "primary", "multi_url": { "url": "detail_url_value", "pc_url": "", "android_url": "", "ios_url": "" } }] }], "en_us": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Branch：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "branch_raw", "tag": "plain_text" } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Commit：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "commit_raw", "text_align": "left", "href": { "commit_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "commit_url_value" } } }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**User：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "user_raw", "href": { "user_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "user_url_value" } } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Status：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "status_raw", "tag": "plain_text" } }] }] }, { "tag": "markdown", "content": "msg_raw" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "Get info" }, "type": "primary", "multi_url": { "url": "detail_url_value", "pc_url": "", "android_url": "", "ios_url": "" } }] }] }, "header": { "template": "blue", "title": { "tag": "plain_text", "i18n": { "zh_cn": "title_raw", "en_us": "title_raw" } } } };
+        const template = { "i18n_elements": { "zh_cn": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**分支：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "BRANCH_RAW" }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**ID：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "[COMMIT_RAW](COMMIT__URL)", "text_align": "left" }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**用户：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "[USER_RAW](USER__URL)" }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**状态：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**<font color='green'>STATUS_RAW</font>**" }] }] }, { "tag": "markdown", "content": "MSG_RAW" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "查看详情" }, "type": "primary", "multi_url": { "url": "DETAIL_URL", "pc_url": "", "android_url": "", "ios_url": "" } }] }], "en_us": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Branch：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "BRANCH_RAW" }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Commit：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "[COMMIT_RAW](COMMIT__URL)", "text_align": "left" }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**User：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "[USER_RAW](USER__URL)" }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Status：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**<font color='green'>STATUS_RAW</font>**" }] }] }, { "tag": "markdown", "content": "MSG_RAW" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "Get info" }, "type": "primary", "multi_url": { "url": "DETAIL_URL", "pc_url": "", "android_url": "", "ios_url": "" } }] }] }, "header": { "template": "blue", "title": { "tag": "plain_text", "i18n": { "zh_cn": "TITLE_RAW", "en_us": "TITLE_RAW" } } } };
         const cardObj = renderFeishuCard(template, mergedValues);
         if (dry) {
             core.info('DRY RUN: final card JSON:');
@@ -30437,82 +30194,6 @@ async function run() {
     }
 }
 run();
-
-
-/***/ }),
-
-/***/ 7564:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
-
-"use strict";
-
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", ({ value: true }));
-const core = __importStar(__nccwpck_require__(7484));
-const index_1 = __nccwpck_require__(98);
-const child_process_1 = __nccwpck_require__(5317);
-const process_1 = __nccwpck_require__(932);
-(async function () {
-    const webhook = "https://open.feishu.cn/open-apis/bot/v2/hook/d29cee07-a9a9-4c93-b49f-d523a74b7a23";
-    const signKey = "ryixficBPFeKisWkQmsFng";
-    const tm = Math.floor(Date.now() / 1000);
-    const sign = (0, index_1.sign_with_timestamp)(tm, signKey);
-    const qs = tm && sign ? `?timestamp=${tm}&sign=${encodeURIComponent(sign)}` : '';
-    (0, child_process_1.exec)(`"bash test.sh" ${qs}`);
-    process_1.exit;
-    const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook;
-    const defaultValues = {
-        actor: "Xr",
-        branch_raw: "main",
-        commit_raw: "d55628af08b2440f",
-        commit_url_value: "https://github.com/XRSec/feishu-bot-webhook-action/actions/runs/16902769680/job/47885354355",
-        user_raw: "xr",
-        user_url_value: "https://github.com/XRSec/feishu-bot-webhook-action/actions/runs/16902769680/job/47885354355",
-        status_raw: "push",
-        msg_raw: "test",
-        title_raw: "test",
-        detail_url_value: "https://github.com/XRSec/feishu-bot-webhook-action/actions/runs/16902769680/job/47885354355",
-        workflow: "test",
-        run_id: "16902769680",
-    };
-    const mergedValues = Object.fromEntries(Object.entries(defaultValues).map(([k, v]) => [k, v == null ? '' : String(v)]));
-    const template = { "i18n_elements": { "zh_cn": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**分支：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "branch_raw", "tag": "plain_text" } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**ID：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "commit_raw", "text_align": "left", "href": { "commit_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "commit_url_value" } } }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**用户：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "user_raw", "href": { "user_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "user_url_value" } } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**状态：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "status_raw", "tag": "plain_text" } }] }] }, { "tag": "markdown", "content": "msg_raw" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "查看详情" }, "type": "primary", "multi_url": { "url": "detail_url_value", "pc_url": "", "android_url": "", "ios_url": "" } }] }], "en_us": [{ "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Branch：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "branch_raw", "tag": "plain_text" } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Commit：**", "text_align": "left" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "commit_raw", "text_align": "left", "href": { "commit_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "commit_url_value" } } }] }] }, { "tag": "column_set", "flex_mode": "none", "background_style": "default", "columns": [{ "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**User：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "user_raw", "href": { "user_url": { "ios_url": "", "pc_url": "", "android_url": "", "url": "user_url_value" } } }] }, { "tag": "column", "width": "auto", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "markdown", "content": "**Status：**" }] }, { "tag": "column", "width": "weighted", "weight": 1, "vertical_align": "center", "elements": [{ "tag": "div", "text": { "content": "status_raw", "tag": "plain_text" } }] }] }, { "tag": "markdown", "content": "msg_raw" }, { "tag": "hr" }, { "tag": "action", "actions": [{ "tag": "button", "text": { "tag": "plain_text", "content": "Get info" }, "type": "primary", "multi_url": { "url": "detail_url_value", "pc_url": "", "android_url": "", "ios_url": "" } }] }] }, "header": { "template": "blue", "title": { "tag": "plain_text", "i18n": { "zh_cn": "title_raw", "en_us": "title_raw" } } } };
-    const cardObj = (0, index_1.renderFeishuCard)(template, mergedValues);
-    const statusCode = await (0, index_1.postToFeishu)(webhookId, (0, index_1.buildInteractiveCardPayload)(cardObj), tm, sign);
-    core.info(`Sent markdown card to Feishu, HTTP status: ${statusCode}`);
-})();
 
 
 /***/ }),
@@ -30674,14 +30355,6 @@ module.exports = require("path");
 
 "use strict";
 module.exports = require("perf_hooks");
-
-/***/ }),
-
-/***/ 932:
-/***/ ((module) => {
-
-"use strict";
-module.exports = require("process");
 
 /***/ }),
 
@@ -32440,7 +32113,7 @@ module.exports = parseParams
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module is referenced by other modules so it can't be inlined
-/******/ 	var __webpack_exports__ = __nccwpck_require__(7564);
+/******/ 	var __webpack_exports__ = __nccwpck_require__(98);
 /******/ 	module.exports = __webpack_exports__;
 /******/ 	
 /******/ })()

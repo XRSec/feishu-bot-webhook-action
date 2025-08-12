@@ -1,6 +1,6 @@
 {
   "name": "feishu-bot-webhook-action",
-  "version": "1.0.12",
+  "version": "1.1.0",
   "description": "GitHub Action for sending notifications to Feishu/Lark bot via webhook",
   "homepage": "https://github.com/XRSec/feishu-bot-webhook-action#readme",
   "bugs": {

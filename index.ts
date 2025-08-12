@@ -52,7 +52,7 @@ function fetchCommitMessageFromGitHub(owner: string, repo: string, sha: string, 
   })
 }
 
-export async function postToFeishu(webhookId: string, body: string, tm?: number, sign?: string): (Promise<number | undefined>) {
+export async function postToFeishu(webhookId: string, body: string, tm?: number, sign?: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const qs = tm && sign ? `?timestamp=${tm}&sign=${encodeURIComponent(sign)}` : ''
     const options: https.RequestOptions = {
@@ -78,20 +78,20 @@ export async function postToFeishu(webhookId: string, body: string, tm?: number,
           const statusCodeField = typeof parsed?.StatusCode === 'number' ? parsed.StatusCode : undefined
           const codeField = typeof parsed?.code === 'number' ? parsed.code : undefined
           if (statusCodeField !== undefined && statusCodeField !== 0) {
-            resolve(parsed?.msg)
+            resolve(parsed?.msg || `Error: StatusCode ${statusCodeField}`)
             return
           }
           if (codeField !== undefined && codeField !== 0) {
             if (codeField === 19021) {
               core.warning('飞书验签失败（19021）：签名不匹配或时间戳与服务器相差超过 1 小时。请检查 FEISHU_BOT_SIGNKEY、时间戳与服务器时间。')
             }
-            resolve(parsed?.msg)
+            resolve(parsed?.msg || `Error: code ${codeField}`)
             return
           }
         } catch {
           core.info(`Feishu response text: ${bodyResp || '<empty>'}`)
         }
-        resolve(res.statusCode)
+        resolve(`Success: HTTP ${res.statusCode}`)
       })
     })
     req.on('error', e => {
@@ -108,23 +108,25 @@ export async function postToFeishu(webhookId: string, body: string, tm?: number,
    Simplified template replacer (only exact-match replacement)
    ----------------------- */
 
-export function renderFeishuCard(template: any, values: Record<string, string>) {
+export function renderFeishuCard(template: unknown, values: Record<string, string>): unknown {
   const card = JSON.parse(JSON.stringify(template)); // 深拷贝
 
-  function replace(obj: any): any {
+  function replace(obj: unknown): unknown {
     if (typeof obj === 'string') {
       // 支持字符串内的变量替换
       let result = obj
       for (const [key, value] of Object.entries(values)) {
-        // 使用全局替换，支持字符串中包含变量的情况
-        result = result.replace(new RegExp(key, 'g'), value)
+        // 使用字符串替换而不是正则表达式，避免注入风险
+        result = result.split(key).join(value)
       }
       return result
     }
     if (Array.isArray(obj)) return obj.map(replace)
     if (obj && typeof obj === 'object') {
-      const newObj: any = {}
-      for (const k of Object.keys(obj)) newObj[k] = replace(obj[k])
+      const newObj: Record<string, unknown> = {}
+      for (const k of Object.keys(obj as Record<string, unknown>)) {
+        newObj[k] = replace((obj as Record<string, unknown>)[k])
+      }
       return newObj
     }
     return obj
@@ -146,8 +148,16 @@ async function run(): Promise<void> {
 
     const msgTextInput = core.getInput('MSG_TEXT') || process.env.MSG_TEXT || ''
 
+    if (!webhook && !dry) {
+      core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.')
+      return
+    }
+
     const payload = context.payload || {}
     core.debug(JSON.stringify(payload))
+    let tm = Math.floor(Date.now() / 1000)
+    let sign = sign_with_timestamp(tm, signKey)
+    let webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
 
     // commit message & sha
     let commitMsg = payload.head_commit?.message || ''
@@ -196,20 +206,12 @@ async function run(): Promise<void> {
     // 仅使用程序内默认变量，不再支持 MSG_VARS
     const mergedValues = Object.fromEntries(Object.entries(defaultValues).map(([k, v]) => [k, v == null ? '' : String(v)])) as Record<string, string>
 
-    if (!webhook && !dry) {
-      core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.')
-      return
-    }
-
-    const tm = Math.floor(Date.now() / 1000)
-    const sign = sign_with_timestamp(tm, signKey)
-    const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
-
-    if (tm) {
+    if (!dry) {
+      // 检查时间戳是否合理（用于调试时间同步问题）
       const nowSec = Math.floor(Date.now() / 1000)
-      const drift = Number(tm) - nowSec
+      const drift = tm - nowSec
       if (Math.abs(drift) > 3700) {
-        core.info(`Feishu signing timestamp:(${tm} ${new Date(Number(tm) * 1000).toISOString()}) nowSec(${nowSec}), drift(s)=${drift}`)
+        core.info(`Feishu signing timestamp:(${tm} ${new Date(tm * 1000).toISOString()}) nowSec(${nowSec}), drift(s)=${drift}`)
         core.warning('时间戳与当前时间相差超过 1 小时，飞书将拒绝请求。请检查 Runner 系统时间。')
       }
     }

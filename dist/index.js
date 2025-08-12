@@ -30041,21 +30041,21 @@ async function postToFeishu(webhookId, body, tm, sign) {
                     const statusCodeField = typeof parsed?.StatusCode === 'number' ? parsed.StatusCode : undefined;
                     const codeField = typeof parsed?.code === 'number' ? parsed.code : undefined;
                     if (statusCodeField !== undefined && statusCodeField !== 0) {
-                        resolve(parsed?.msg);
+                        resolve(parsed?.msg || `Error: StatusCode ${statusCodeField}`);
                         return;
                     }
                     if (codeField !== undefined && codeField !== 0) {
                         if (codeField === 19021) {
                             core.warning('飞书验签失败（19021）：签名不匹配或时间戳与服务器相差超过 1 小时。请检查 FEISHU_BOT_SIGNKEY、时间戳与服务器时间。');
                         }
-                        resolve(parsed?.msg);
+                        resolve(parsed?.msg || `Error: code ${codeField}`);
                         return;
                     }
                 }
                 catch {
                     core.info(`Feishu response text: ${bodyResp || '<empty>'}`);
                 }
-                resolve(res.statusCode);
+                resolve(`Success: HTTP ${res.statusCode}`);
             });
         });
         req.on('error', e => {
@@ -30073,7 +30073,7 @@ function renderFeishuCard(template, values) {
         if (typeof obj === 'string') {
             let result = obj;
             for (const [key, value] of Object.entries(values)) {
-                result = result.replace(new RegExp(key, 'g'), value);
+                result = result.split(key).join(value);
             }
             return result;
         }
@@ -30081,8 +30081,9 @@ function renderFeishuCard(template, values) {
             return obj.map(replace);
         if (obj && typeof obj === 'object') {
             const newObj = {};
-            for (const k of Object.keys(obj))
+            for (const k of Object.keys(obj)) {
                 newObj[k] = replace(obj[k]);
+            }
             return newObj;
         }
         return obj;
@@ -30096,8 +30097,15 @@ async function run() {
         const dryInput = core.getInput('DRY_RUN') || process.env.DRY_RUN || '';
         const dry = dryInput === 'true' || dryInput === '1' || process.argv.includes('--dry');
         const msgTextInput = core.getInput('MSG_TEXT') || process.env.MSG_TEXT || '';
+        if (!webhook && !dry) {
+            core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.');
+            return;
+        }
         const payload = github_1.context.payload || {};
         core.debug(JSON.stringify(payload));
+        let tm = Math.floor(Date.now() / 1000);
+        let sign = sign_with_timestamp(tm, signKey);
+        let webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook;
         let commitMsg = payload.head_commit?.message || '';
         let sha = payload.head_commit?.id || process.env.GITHUB_SHA || '';
         if (!commitMsg && process.env.GITHUB_TOKEN && sha && payload.repository?.full_name) {
@@ -30138,18 +30146,11 @@ async function run() {
             run_id: runId,
         };
         const mergedValues = Object.fromEntries(Object.entries(defaultValues).map(([k, v]) => [k, v == null ? '' : String(v)]));
-        if (!webhook && !dry) {
-            core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.');
-            return;
-        }
-        const tm = Math.floor(Date.now() / 1000);
-        const sign = sign_with_timestamp(tm, signKey);
-        const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook;
-        if (tm) {
+        if (!dry) {
             const nowSec = Math.floor(Date.now() / 1000);
-            const drift = Number(tm) - nowSec;
+            const drift = tm - nowSec;
             if (Math.abs(drift) > 3700) {
-                core.info(`Feishu signing timestamp:(${tm} ${new Date(Number(tm) * 1000).toISOString()}) nowSec(${nowSec}), drift(s)=${drift}`);
+                core.info(`Feishu signing timestamp:(${tm} ${new Date(tm * 1000).toISOString()}) nowSec(${nowSec}), drift(s)=${drift}`);
                 core.warning('时间戳与当前时间相差超过 1 小时，飞书将拒绝请求。请检查 Runner 系统时间。');
             }
         }

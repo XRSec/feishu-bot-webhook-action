@@ -10,7 +10,7 @@ on:
       custom_message:
         description: '这是一个按钮'
         required: false
-        default: ''
+        default: '这是一个输入框'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -27,15 +27,52 @@ jobs:
           FEISHU_BOT_WEBHOOK: ${{ secrets.FEISHU_BOT_WEBHOOK }}
           FEISHU_BOT_SIGNKEY: ${{ secrets.FEISHU_BOT_SIGNKEY }}
           MSG_TEXT: |
-            notation字号
-            standard emoji 😁😢🌞💼🏆❌✅
-            *italic*
-            **bold**
-            ~~strikethrough~~
-            [differentiated redirection]($urlVal)
-            <at id=all></at>"
-            // Content written using markdown syntax
-                        
+            标准emoji 😁😢🌞💼🏆❌✅
+            飞书emoji :OK::THUMBSUP:
+              *斜体* **粗体** ~~删除线~~
+              <font color='red'>这是红色文本</font>
+              <text_tag color='blue'>标签</text_tag>
+              [文字链接](/ssl:ttdoc/home/index)
+              <link icon='chat_outlined' url='https://open.feishu.cn' pc_url='' ios_url='' android_url=''>带图标的链接</link>
+              <at id=all></at>
+            
+            无序列表:
+              - 项目一
+              - 项目二
+                - 子项目 a
+                - 子项目 b
+            
+            有序列表:
+              1. 第一项
+              2. 第二项
+              1. 子项 2.1
+              2. 子项 2.2
+            
+            代码块:
+              ```javascript
+              // JavaScript 代码示例
+              function hello(name) {
+              console.log('Hello, ' + name);
+            }
+              hello('Feishu');
+              ```
+            
+            水平分割线:
+            ---
+              
+              换行：在行末加两个空格然后回车
+              或使用 HTML 换行：<br/>
+            
+            图片（Markdown）: 需要 imagekey [参考飞书文档](https://open.feishu.cn/document/feishu-cards/card-components/content-components/rich-text)
+            
+            图片（HTML）:
+              <img src="https://lf-package-cn.feishucdn.com/obj/feishu-static/lark/open/doc/frontend/favicon.png" alt="替代文字" />
+            
+            按钮/操作（卡片内通常用按钮组件，这里示例 link）:
+              <link icon='external' url='https://open.feishu.cn' pc_url='' ios_url='' android_url=''>打开飞书官网</link>
+              
+              备注：
+            - 部分富文本特性（比如复选框、表格或图片的支持与展示样式）会依赖飞书卡片的具体渲染环境与版本，若有某些在实际卡片中不生效，我可以帮你把对应内容改写成卡片组件（比如把任务改成 actions 按钮或把图片换为 image 组件）的示例 JSON。
 
   notify-on-push:
     runs-on: ubuntu-latest

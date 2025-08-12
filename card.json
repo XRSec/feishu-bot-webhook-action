@@ -1,0 +1,338 @@
+{
+    "i18n_elements": {
+      "zh_cn": [
+        {
+          "tag": "column_set",
+          "flex_mode": "none",
+          "background_style": "default",
+          "columns": [
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**分支：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "div",
+                  "text": {
+                    "content": "branch_raw",
+                    "tag": "plain_text"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**ID：**",
+                  "text_align": "left"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "commit_raw",
+                  "text_align": "left",
+                  "href": {
+                    "commit_url": {
+                      "ios_url": "",
+                      "pc_url": "",
+                      "android_url": "",
+                      "url": "commit_url_value"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "column_set",
+          "flex_mode": "none",
+          "background_style": "default",
+          "columns": [
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**用户：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "user_raw",
+                  "href": {
+                    "user_url": {
+                      "ios_url": "",
+                      "pc_url": "",
+                      "android_url": "",
+                      "url": "user_url_value"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**状态：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "div",
+                  "text": {
+                    "content": "status_raw",
+                    "tag": "plain_text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "msg_raw"
+        },
+        {
+          "tag": "hr"
+        },
+        {
+          "tag": "action",
+          "actions": [
+            {
+              "tag": "button",
+              "text": {
+                "tag": "plain_text",
+                "content": "查看详情"
+              },
+              "type": "primary",
+              "multi_url": {
+                "url": "detail_url_value",
+                "pc_url": "",
+                "android_url": "",
+                "ios_url": ""
+              }
+            }
+          ]
+        }
+      ],
+      "en_us": [
+        {
+          "tag": "column_set",
+          "flex_mode": "none",
+          "background_style": "default",
+          "columns": [
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**Branch：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "div",
+                  "text": {
+                    "content": "branch_raw",
+                    "tag": "plain_text"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**Commit：**",
+                  "text_align": "left"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "commit_raw",
+                  "text_align": "left",
+                  "href": {
+                    "commit_url": {
+                      "ios_url": "",
+                      "pc_url": "",
+                      "android_url": "",
+                      "url": "commit_url_value"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "column_set",
+          "flex_mode": "none",
+          "background_style": "default",
+          "columns": [
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**User：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "user_raw",
+                  "href": {
+                    "user_url": {
+                      "ios_url": "",
+                      "pc_url": "",
+                      "android_url": "",
+                      "url": "user_url_value"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "auto",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "markdown",
+                  "content": "**Status：**"
+                }
+              ]
+            },
+            {
+              "tag": "column",
+              "width": "weighted",
+              "weight": 1,
+              "vertical_align": "center",
+              "elements": [
+                {
+                  "tag": "div",
+                  "text": {
+                    "content": "status_raw",
+                    "tag": "plain_text"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "tag": "markdown",
+          "content": "msg_raw"
+        },
+        {
+          "tag": "hr"
+        },
+        {
+          "tag": "action",
+          "actions": [
+            {
+              "tag": "button",
+              "text": {
+                "tag": "plain_text",
+                "content": "Get info"
+              },
+              "type": "primary",
+              "multi_url": {
+                "url": "detail_url_value",
+                "pc_url": "",
+                "android_url": "",
+                "ios_url": ""
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "header": {
+      "template": "blue",
+      "title": {
+        "tag": "plain_text",
+        "i18n": {
+          "zh_cn": "title_raw",
+          "en_us": "title_raw"
+        }
+      }
+    }
+  }

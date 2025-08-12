@@ -1,0 +1,22 @@
+name: 'Feishu Bot Webhook Action'
+description: '发送消息到飞书机器人的 GitHub Action'
+author: 'XRSec'
+
+inputs:
+  FEISHU_BOT_WEBHOOK:
+    description: '飞书机器人的 webhook URL'
+    required: true
+  FEISHU_BOT_SIGNKEY:
+    description: '飞书机器人的签名密钥（可选）'
+    required: false
+  TXT_MSG:
+    description: '要发送的文本消息。如果不为空，将直接发送文本消息；否则发送 GitHub 事件模板消息'
+    required: false
+
+runs:
+  using: 'node20'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'message-circle'
+  color: 'blue'

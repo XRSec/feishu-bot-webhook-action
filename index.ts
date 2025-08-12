@@ -13,11 +13,20 @@ function execTrim(cmd: string): string {
 }
 
 function sign_with_timestamp(timestamp: string, secret: string): string {
-  const stringToSign = `${timestamp}\n${secret}`;
-  const hmac = crypto.createHmac('sha256', stringToSign);
-  return hmac.digest('base64');
+  const message = `${timestamp}\n${secret}`
+  const hmac = crypto.createHmac('sha256', secret)
+  hmac.update(message)
+  return hmac.digest('base64')
 }
 
+// Build Feishu payloads
+function buildInteractiveCardPayload(card: unknown): string {
+  return JSON.stringify({ msg_type: 'interactive', card })
+}
+
+function buildTextPayload(text: string): string {
+  return JSON.stringify({ msg_type: 'text', content: { text } })
+}
 
 /** 拉取 commit message（用 GitHub API） */
 function fetchCommitMessageFromGitHub(owner: string, repo: string, sha: string, token: string): Promise<string> {
@@ -100,7 +109,7 @@ async function postToFeishu(webhookId: string, body: string, tm?: string, sign?:
 function renderFeishuCard(template: any, values: Record<string, string>) {
   const card = JSON.parse(JSON.stringify(template)); // 深拷贝
 
-  function replace(obj: any) {
+  function replace(obj: any): any {
     if (typeof obj === "string") {
       if (values.hasOwnProperty(obj)) {
         return values[obj];
@@ -128,10 +137,9 @@ async function run(): Promise<void> {
   try {
     const webhook = core.getInput('FEISHU_BOT_WEBHOOK') || process.env.FEISHU_BOT_WEBHOOK || ''
     const signKey = core.getInput('FEISHU_BOT_SIGNKEY') || process.env.FEISHU_BOT_SIGNKEY || ''
-    const dryInput = core.getInput('DRY_RUN') || process.env.DRY_RUN || '' // TODO fix DRY_RUN 相关内容
+    const dryInput = core.getInput('DRY_RUN') || process.env.DRY_RUN || ''
     const dry = dryInput === 'true' || dryInput === '1' || process.argv.includes('--dry')
-    // TODO ADD MSG_TEXT
-    // TODO ADD MSG_MARKDOWN
+    const txtMsgInput = core.getInput('TXT_MSG') || process.env.TXT_MSG || ''
 
     if (!webhook && !dry) {
       core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.')
@@ -167,8 +175,28 @@ async function run(): Promise<void> {
     const status = payload.action || 'ok'
     const workflow = process.env.GITHUB_WORKFLOW || 'workflow'
     const title = `Action ${repoName || workflow} OK`
+    const runId = process.env.GITHUB_RUN_ID || ''
+    const detailUrl = (repoFull && runId) ? `https://github.com/${repoFull}/actions/runs/${runId}` : (commitUrl || '')
+
+    // If TXT_MSG provided, send as plain text message
+    if (txtMsgInput) {
+      const body = buildTextPayload(txtMsgInput)
+      if (dry) {
+        core.info('DRY RUN: final text message JSON:')
+        core.info(body)
+        return
+      }
+      const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
+      const tm = signKey ? Math.floor(Date.now() / 1000).toString() : undefined
+      const sign = signKey && tm ? sign_with_timestamp(tm, signKey) : undefined
+      const statusCode = await postToFeishu(webhookId, body, tm, sign)
+      core.info(`Sent text to Feishu, HTTP status: ${statusCode}`)
+      return
+    }
 
     const template = {"i18n_elements":{"zh_cn":[{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**分支：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"branch_raw","tag":"plain_text"}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**ID：**","text_align":"left"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"commit_raw","text_align":"left","href":{"commit_url":{"ios_url":"","pc_url":"","android_url":"","url":"commit_url_value"}}}]}]},{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**用户：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"user_raw","href":{"user_url":{"ios_url":"","pc_url":"","android_url":"","url":"user_url_value"}}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**状态：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"status_raw","tag":"plain_text"}}]}]},{"tag":"markdown","content":"msg_raw"},{"tag":"hr"},{"tag":"action","actions":[{"tag":"button","text":{"tag":"plain_text","content":"查看详情"},"type":"primary","multi_url":{"url":"detail_url_value","pc_url":"","android_url":"","ios_url":""}}]}],"en_us":[{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Branch：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"branch_raw","tag":"plain_text"}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Commit：**","text_align":"left"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"commit_raw","text_align":"left","href":{"commit_url":{"ios_url":"","pc_url":"","android_url":"","url":"commit_url_value"}}}]}]},{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**User：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"user_raw","href":{"user_url":{"ios_url":"","pc_url":"","android_url":"","url":"user_url_value"}}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Status：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"status_raw","tag":"plain_text"}}]}]},{"tag":"markdown","content":"msg_raw"},{"tag":"hr"},{"tag":"action","actions":[{"tag":"button","text":{"tag":"plain_text","content":"Get info"},"type":"primary","multi_url":{"url":"detail_url_value","pc_url":"","android_url":"","ios_url":""}}]}]},"header":{"template":"blue","title":{"tag":"plain_text","i18n":{"zh_cn":"title_raw","en_us":"title_raw"}}}}
+
+    const msg = commitMsg || 'No commit message'
 
     const values = {
       branch_raw: branch,
@@ -177,25 +205,25 @@ async function run(): Promise<void> {
       user_raw: actor,
       user_url_value: userUrl,
       status_raw: status,
-      msg_raw: msg, // TODO fix
+      msg_raw: msg,
       title_raw: title,
-      detail_url_value: '',// TODO fix lake https://github.com/XRSec/feishu-bot-webhook-action/actions/runs/16896930608
+      detail_url_value: detailUrl,
     };
     
     const cardObj = renderFeishuCard(template, values);
 
     if (dry) {
       core.info('DRY RUN: final card JSON:')
-      core.info(JSON.stringify(cardObj, null, 2))
+      core.info(buildInteractiveCardPayload(cardObj))
       return
     }
 
     // live send
     const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
-    const tm = Math.floor(Date.now() / 1000).toString(); // 秒级字符串
-    const sign = sign_with_timestamp(tm, signKey);
+    const tm = signKey ? Math.floor(Date.now() / 1000).toString() : undefined
+    const sign = signKey && tm ? sign_with_timestamp(tm, signKey) : undefined
 
-    const statusCode = await postToFeishu(webhookId, JSON.stringify(cardObj), tm, sign)
+    const statusCode = await postToFeishu(webhookId, buildInteractiveCardPayload(cardObj), tm, sign)
     core.info(`Sent card to Feishu, HTTP status: ${statusCode}`)
   } catch (error) {
     core.setFailed(`Action failed: ${error}`)

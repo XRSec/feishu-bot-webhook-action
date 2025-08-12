@@ -12,6 +12,9 @@ inputs:
   TXT_MSG:
     description: '要发送的文本消息。如果不为空，将直接发送文本消息；否则发送 GitHub 事件模板消息'
     required: false
+  DRY_RUN:
+    description: '仅打印将要发送的消息而不实际发送（true/1）'
+    required: false
 
 runs:
   using: 'node20'

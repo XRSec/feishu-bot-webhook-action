@@ -11,7 +11,7 @@ inputs:
     required: false
   MSG_TEXT:
     description: '要发送的 Markdown 消息内容。如果不为空，将发送简化的 Markdown 卡片；否则发送 GitHub 事件模板消息'
-    required: false
+    required: true
   DRY_RUN:
     description: '仅打印将要发送的消息而不实际发送（true/1）'
     required: false

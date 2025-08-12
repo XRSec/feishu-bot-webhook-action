@@ -1,0 +1,53 @@
+{
+  "name": "feishu-bot-webhook-action",
+  "version": "1.1.0",
+  "description": "GitHub Action for sending notifications to Feishu/Lark bot via webhook",
+  "homepage": "https://github.com/XRSec/feishu-bot-webhook-action#readme",
+  "bugs": {
+    "url": "https://github.com/XRSec/feishu-bot-webhook-action/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/XRSec/feishu-bot-webhook-action.git"
+  },
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "npx ncc build index.ts -o dist --source-map",
+    "release": "./scripts/release.sh",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean"
+  },
+  "keywords": [
+    "github-action",
+    "bot",
+    "feishu",
+    "lark",
+    "webhook",
+    "notification",
+    "ci-cd",
+    "automation"
+  ],
+  "author": "XRSec",
+  "license": "ISC",
+  "dependencies": {
+    "@actions/core": "^1.11.1",
+    "@actions/github": "^6.0.1",
+    "@types/node": "^20.12.7",
+    "ts-node": "^10.9.2"
+  },
+  "devDependencies": {
+    "@vercel/ncc": "^0.38.3",
+    "typescript": "^5.9.2"
+  }
+}

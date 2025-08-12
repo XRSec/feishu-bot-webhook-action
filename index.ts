@@ -192,6 +192,41 @@ function renderFeishuCard(template: any, values: Record<string, string>) {
   return replace(card)
 }
 
+// Add utility to safely parse JSON from inputs
+function parseJSONInput<T>(input: string, name: string): T | undefined {
+  if (!input) return undefined;
+  try {
+    return JSON.parse(input) as T;
+  } catch (e) {
+    core.warning(`Invalid JSON provided for ${name}: ${e}`);
+    return undefined;
+  }
+}
+
+// -----------------------
+// Markdown Element options util
+// -----------------------
+
+function readMarkdownElementOptions(): Partial<Omit<MarkdownCardElement, 'tag' | 'content'>> {
+  // Support both Action inputs and environment variables
+  const textSize = core.getInput('MD_TEXT_SIZE') || process.env.MD_TEXT_SIZE || ''
+  const textAlign = core.getInput('MD_TEXT_ALIGN') || process.env.MD_TEXT_ALIGN || ''
+  const iconJson = core.getInput('MD_ICON_JSON') || process.env.MD_ICON_JSON || ''
+  const hrefJson = core.getInput('MD_HREF_JSON') || process.env.MD_HREF_JSON || ''
+
+  const opts: Partial<Omit<MarkdownCardElement, 'tag' | 'content'>> = {}
+  if (textSize === 'normal' || textSize === 'heading') opts.text_size = textSize as 'normal' | 'heading'
+  if (textAlign === 'left' || textAlign === 'center' || textAlign === 'right') opts.text_align = textAlign as 'left' | 'center' | 'right'
+
+  const icon = parseJSONInput<MarkdownCardElement['icon']>(iconJson, 'MD_ICON_JSON')
+  if (icon && icon.tag) opts.icon = icon
+
+  const href = parseJSONInput<MarkdownCardElement['href']>(hrefJson, 'MD_HREF_JSON')
+  if (href) opts.href = href
+
+  return opts
+}
+
 /* -----------------------
    Main run (MSG_TEXT 原样发送；template fallback 使用 exact-match 替换)
    ----------------------- */
@@ -275,16 +310,15 @@ async function run(): Promise<void> {
       return
     }
 
-    // 如果提供 MSG_TEXT，则**原样**当作 Markdown 富文本发送（不做占位替换）
+    // 如果提供 MSG_TEXT / TXT_MSG，则按 Markdown 元素发送，可附带 text_size / text_align / icon / href 等配置
     if (msgTextInput) {
+      const elementOptions = readMarkdownElementOptions()
+      const markdownElement = buildMarkdownElement(msgTextInput, elementOptions)
+
       const postCard = {
         i18n_elements: {
-          zh_cn: [
-            { tag: 'markdown', content: msgTextInput }
-          ],
-          en_us: [
-            { tag: 'markdown', content: msgTextInput }
-          ]
+          zh_cn: [markdownElement],
+          en_us: [markdownElement]
         }
       }
 

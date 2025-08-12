@@ -1,0 +1,327 @@
+import * as core from '@actions/core'
+import { context } from '@actions/github'
+import * as https from 'https'
+import * as crypto from 'crypto'
+import * as child from 'child_process'
+
+
+
+
+
+interface MarkdownCardElement {
+  tag: "markdown";
+  content: string;
+  text_size?: "normal" | "heading";
+  text_align?: "left" | "center" | "right";
+  icon?: {
+    tag: "standard_icon" | "custom_icon";
+    token?: string;
+    color?: string;
+    img_key?: string;
+  };
+  href?: Record<
+    string,
+    {
+      url: string;
+      pc_url?: string;
+      ios_url?: string;
+      android_url?: string;
+    }
+  >;
+}
+
+/**
+ * 创建飞书卡片的 Markdown 元素
+ * @param mdText 纯 Markdown 文本
+ * @param options 额外配置，比如 text_size / text_align / icon / href
+ */
+function buildMarkdownElement(
+  mdText: string,
+  options: Partial<Omit<MarkdownCardElement, "tag" | "content">> = {}
+): MarkdownCardElement {
+  return {
+    tag: "markdown",
+    content: mdText,
+    ...options,
+  };
+}
+
+/**
+ * 构造飞书卡片 JSON
+ * @param title 卡片标题
+ * @param mdText 纯 Markdown 文本
+ */
+function buildFeishuMarkdownCard(title: string, mdText: string) {
+  const markdownElement = buildMarkdownElement(mdText, {
+    text_size: "normal",
+    text_align: "left",
+    icon: {
+      tag: "standard_icon",
+      token: "chat-forbidden_outlined",
+      color: "orange",
+    },
+  });
+
+  return {
+    msg_type: "interactive",
+    card: {
+      header: {
+        template: "blue", // 卡片头部主题色
+        title: {
+          tag: "plain_text",
+          content: title,
+        },
+      },
+      elements: [markdownElement],
+    },
+  };
+}
+
+function execTrim(cmd: string): string {
+  try {
+    return child.execSync(cmd, { stdio: ['pipe', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return ''
+  }
+}
+
+function sign_with_timestamp(timestamp: string, secret: string): string {
+  const message = `${timestamp}\n${secret}`
+  const hmac = crypto.createHmac('sha256', secret)
+  hmac.update(message)
+  return hmac.digest('base64')
+}
+
+function buildInteractiveCardPayload(card: unknown): string {
+  return JSON.stringify({ msg_type: 'interactive', card })
+}
+
+/** 拉取 commit message（用 GitHub API） */
+function fetchCommitMessageFromGitHub(owner: string, repo: string, sha: string, token: string): Promise<string> {
+  return new Promise((resolve) => {
+    if (!token || !owner || !repo || !sha) { resolve(''); return }
+    const options: https.RequestOptions = {
+      hostname: 'api.github.com',
+      path: `/repos/${owner}/${repo}/commits/${sha}`,
+      method: 'GET',
+      headers: {
+        'User-Agent': 'node.js',
+        'Accept': 'application/vnd.github.v3+json',
+        'Authorization': `token ${token}`
+      }
+    }
+    const req = https.request(options, res => {
+      let data = ''
+      res.on('data', c => data += c.toString())
+      res.on('end', () => {
+        try {
+          const j = JSON.parse(data || '{}')
+          resolve(j.commit?.message || '')
+        } catch {
+          resolve('')
+        }
+      })
+    })
+    req.on('error', () => resolve(''))
+    req.end()
+  })
+}
+
+async function postToFeishu(webhookId: string, body: string, tm?: string, sign?: string): Promise<number | undefined> {
+  return new Promise((resolve, reject) => {
+    const qs = tm && sign ? `?timestamp=${tm}&sign=${encodeURIComponent(sign)}` : ''
+    const options: https.RequestOptions = {
+      hostname: 'open.feishu.cn',
+      port: 443,
+      path: `/open-apis/bot/v2/hook/${webhookId}${qs}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body, 'utf8')
+      }
+    }
+
+    const req = https.request(options, res => {
+      let bodyResp = ''
+      res.on('data', chunk => bodyResp += chunk.toString())
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(bodyResp || '{}')
+          core.info(`Feishu response JSON: ${JSON.stringify(parsed)}`)
+          if (parsed?.StatusCode != 0 ) {
+            resolve(res.statusCode)
+            return
+          }
+        } catch {
+          core.info(`Feishu response text: ${bodyResp || '<empty>'}`)
+        }
+        resolve(res.statusCode)
+      })
+    })
+    req.on('error', e => {
+      core.error(`Feishu request error: ${e && (e.stack || e.message || e)}`)
+      reject(e)
+    })
+    req.write(body)
+    req.end()
+  })
+}
+
+/* -----------------------
+   Simplified template replacer (only exact-match replacement)
+   ----------------------- */
+
+function renderFeishuCard(template: any, values: Record<string, string>) {
+  const card = JSON.parse(JSON.stringify(template)); // 深拷贝
+
+  function replace(obj: any): any {
+    if (typeof obj === 'string') {
+      // 仅当字符串完全等于 values 的 key 时替换（向后兼容旧行为）
+      if (values.hasOwnProperty(obj)) return values[obj]
+      return obj
+    }
+    if (Array.isArray(obj)) return obj.map(replace)
+    if (obj && typeof obj === 'object') {
+      const newObj: any = {}
+      for (const k of Object.keys(obj)) newObj[k] = replace(obj[k])
+      return newObj
+    }
+    return obj
+  }
+
+  return replace(card)
+}
+
+/* -----------------------
+   Main run (MSG_TEXT 原样发送；template fallback 使用 exact-match 替换)
+   ----------------------- */
+
+async function run(): Promise<void> {
+  try {
+    const webhook = core.getInput('FEISHU_BOT_WEBHOOK') || process.env.FEISHU_BOT_WEBHOOK || ''
+    const signKey = core.getInput('FEISHU_BOT_SIGNKEY') || process.env.FEISHU_BOT_SIGNKEY || ''
+    const dryInput = core.getInput('DRY_RUN') || process.env.DRY_RUN || ''
+    const dry = dryInput === 'true' || dryInput === '1' || process.argv.includes('--dry')
+
+    const msgTextInput = core.getInput('MSG_TEXT') || process.env.MSG_TEXT || ''
+    /**
+     * 
+     * // ===== 使用示例 =====
+     * const MSG_TEXT = `
+     * **飞书卡片 Markdown 测试**
+     * - 支持加粗 / 斜体 / 删除线
+     * - [超链接](https://example.com)
+     * <at id=all></at>
+     * `;
+     * 
+     * const cardData = buildFeishuMarkdownCard("富文本消息测试！", MSG_TEXT);
+     * 
+     * console.log(JSON.stringify(cardData, null, 2));
+     * 
+     */
+
+    const payload = context.payload || {}
+    core.debug(JSON.stringify(payload))
+
+    // commit message & sha
+    let commitMsg = payload.head_commit?.message || ''
+    let sha = payload.head_commit?.id || process.env.GITHUB_SHA || ''
+    if (!commitMsg && process.env.GITHUB_TOKEN && sha && payload.repository?.full_name) {
+      const [owner, repo] = (payload.repository.full_name || '').split('/')
+      commitMsg = await fetchCommitMessageFromGitHub(owner, repo, sha, process.env.GITHUB_TOKEN || '')
+    }
+    if (!commitMsg && !process.env.GITHUB_SHA) {
+      commitMsg = execTrim(`git show -s --format=%s ${sha || 'HEAD'}`) || ''
+    }
+
+    // runtime variables
+    const actor = payload.sender?.login || payload.repository?.owner?.login || process.env.GITHUB_ACTOR || execTrim('git config user.name') || 'unknown'
+    const repoFull = payload.repository?.full_name || process.env.GITHUB_REPOSITORY || ''
+    const repoName = payload.repository?.name || (repoFull.split('/')[1] || '')
+    const ref = payload.ref || process.env.GITHUB_REF || ''
+    const branch = typeof ref === 'string' && ref.includes('refs/heads/') ? ref.replace('refs/heads/', '') : (process.env.GITHUB_REF_NAME || 'main')
+    const commitShort = (sha || '').slice(0, 16)
+    const commitUrl = payload.compare || (sha && repoFull ? `https://github.com/${repoFull}/commit/${sha}` : '')
+    const userUrl = payload.sender?.html_url || payload.repository?.owner?.html_url || (actor ? `https://github.com/${actor}` : '')
+    const status = payload.action || 'ok'
+    const workflow = process.env.GITHUB_WORKFLOW || 'workflow'
+    const title = `Action ${repoName || workflow} OK`
+    const runId = process.env.GITHUB_RUN_ID || ''
+    const detailUrl = (repoFull && runId) ? `https://github.com/${repoFull}/actions/runs/${runId}` : (commitUrl || '')
+
+    const defaultValues: Record<string,string|undefined> = {
+      actor: actor,
+      repo_full: repoFull,
+      repo_name: repoName,
+      branch_raw: branch,
+      commit_short: commitShort,
+      commit_raw: commitShort,
+      commit_url_value: commitUrl,
+      user_raw: actor,
+      user_url_value: userUrl,
+      status_raw: status,
+      msg_raw: commitMsg || 'No commit message',
+      title_raw: title,
+      detail_url_value: detailUrl,
+      workflow: workflow,
+      run_id: runId,
+    }
+
+    // 仅使用程序内默认变量，不再支持 MSG_VARS
+    const mergedValues = Object.fromEntries(Object.entries(defaultValues).map(([k,v]) => [k, v == null ? '' : String(v)])) as Record<string,string>
+
+    if (!webhook && !dry) {
+      core.setFailed('FEISHU_BOT_WEBHOOK is required for live send. For dry run set DRY_RUN=true or use --dry.')
+      return
+    }
+
+    // 如果提供 MSG_TEXT，则**原样**当作 Markdown 富文本发送（不做占位替换）
+    if (msgTextInput) {
+      const postCard = {
+        i18n_elements: {
+          zh_cn: [
+            { tag: 'markdown', content: msgTextInput }
+          ],
+          en_us: [
+            { tag: 'markdown', content: msgTextInput }
+          ]
+        }
+      }
+
+      if (dry) {
+        core.info('DRY RUN: final markdown card JSON:')
+        core.info(buildInteractiveCardPayload(postCard))
+        return
+      }
+
+      const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
+      const tm = signKey ? Math.floor(Date.now() / 1000).toString() : undefined
+      const sign = signKey && tm ? sign_with_timestamp(tm, signKey) : undefined
+      const statusCode = await postToFeishu(webhookId, buildInteractiveCardPayload(postCard), tm, sign)
+      core.info(`Sent markdown card to Feishu, HTTP status: ${statusCode}`)
+      return
+    }
+
+    // 否则使用默认 template（只做 exact-match 替换）
+    const template = {"i18n_elements":{"zh_cn":[{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**分支：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"branch_raw","tag":"plain_text"}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**ID：**","text_align":"left"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"commit_raw","text_align":"left","href":{"commit_url":{"ios_url":"","pc_url":"","android_url":"","url":"commit_url_value"}}}]}]},{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**用户：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"user_raw","href":{"user_url":{"ios_url":"","pc_url":"","android_url":"","url":"user_url_value"}}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**状态：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"status_raw","tag":"plain_text"}}]}]},{"tag":"markdown","content":"msg_raw"},{"tag":"hr"},{"tag":"action","actions":[{"tag":"button","text":{"tag":"plain_text","content":"查看详情"},"type":"primary","multi_url":{"url":"detail_url_value","pc_url":"","android_url":"","ios_url":""}}]}],"en_us":[{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Branch：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"branch_raw","tag":"plain_text"}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Commit：**","text_align":"left"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"commit_raw","text_align":"left","href":{"commit_url":{"ios_url":"","pc_url":"","android_url":"","url":"commit_url_value"}}}]}]},{"tag":"column_set","flex_mode":"none","background_style":"default","columns":[{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**User：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"user_raw","href":{"user_url":{"ios_url":"","pc_url":"","android_url":"","url":"user_url_value"}}}]},{"tag":"column","width":"auto","weight":1,"vertical_align":"center","elements":[{"tag":"markdown","content":"**Status：**"}]},{"tag":"column","width":"weighted","weight":1,"vertical_align":"center","elements":[{"tag":"div","text":{"content":"status_raw","tag":"plain_text"}}]}]},{"tag":"markdown","content":"msg_raw"},{"tag":"hr"},{"tag":"action","actions":[{"tag":"button","text":{"tag":"plain_text","content":"Get info"},"type":"primary","multi_url":{"url":"detail_url_value","pc_url":"","android_url":"","ios_url":""}}]}]},"header":{"template":"blue","title":{"tag":"plain_text","i18n":{"zh_cn":"title_raw","en_us":"title_raw"}}}}
+
+    const cardObj = renderFeishuCard(template, mergedValues)
+
+    if (dry) {
+      core.info('DRY RUN: final card JSON:')
+      core.info(buildInteractiveCardPayload(cardObj))
+      return
+    }
+
+    const webhookId = webhook.includes('hook/') ? webhook.slice(webhook.indexOf('hook/') + 5) : webhook
+    const tm = signKey ? Math.floor(Date.now() / 1000).toString() : undefined
+    const sign = signKey && tm ? sign_with_timestamp(tm, signKey) : undefined
+
+    const statusCode = await postToFeishu(webhookId, buildInteractiveCardPayload(cardObj), tm, sign)
+    core.info(`Sent card to Feishu, HTTP status: ${statusCode}`)
+  } catch (error) {
+    core.setFailed(`Action failed: ${error}`)
+  }
+}
+
+run()

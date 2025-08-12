@@ -30070,9 +30070,11 @@ function renderFeishuCard(template, values) {
     const card = JSON.parse(JSON.stringify(template));
     function replace(obj) {
         if (typeof obj === 'string') {
-            if (values.hasOwnProperty(obj))
-                return values[obj];
-            return obj;
+            let result = obj;
+            for (const [key, value] of Object.entries(values)) {
+                result = result.replace(new RegExp(key, 'g'), value);
+            }
+            return result;
         }
         if (Array.isArray(obj))
             return obj.map(replace);
@@ -30121,16 +30123,16 @@ async function run() {
             actor: actor,
             repo_full: repoFull,
             repo_name: repoName,
-            branch_raw: branch,
+            BRANCH_RAW: branch,
             commit_short: commitShort,
-            commit_raw: commitShort,
-            commit_url_value: commitUrl,
-            user_raw: actor,
-            user_url_value: userUrl,
-            status_raw: status,
-            msg_raw: commitMsg || 'No commit message',
-            title_raw: title,
-            detail_url_value: detailUrl,
+            COMMIT_RAW: commitShort,
+            'COMMIT__URL': commitUrl,
+            USER_RAW: actor,
+            'USER__URL': userUrl,
+            STATUS_RAW: status,
+            MSG_RAW: commitMsg || 'No commit message',
+            TITLE_RAW: title,
+            DETAIL_URL: detailUrl,
             workflow: workflow,
             run_id: runId,
         };

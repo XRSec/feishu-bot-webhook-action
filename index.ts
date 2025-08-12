@@ -112,9 +112,13 @@ export function renderFeishuCard(template: any, values: Record<string, string>) 
 
   function replace(obj: any): any {
     if (typeof obj === 'string') {
-      // 仅当字符串完全等于 values 的 key 时替换（向后兼容旧行为）
-      if (values.hasOwnProperty(obj)) return values[obj]
-      return obj
+      // 支持字符串内的变量替换
+      let result = obj
+      for (const [key, value] of Object.entries(values)) {
+        // 使用全局替换，支持字符串中包含变量的情况
+        result = result.replace(new RegExp(key, 'g'), value)
+      }
+      return result
     }
     if (Array.isArray(obj)) return obj.map(replace)
     if (obj && typeof obj === 'object') {
@@ -174,16 +178,16 @@ async function run(): Promise<void> {
       actor: actor,
       repo_full: repoFull,
       repo_name: repoName,
-      branch_raw: branch,
+      BRANCH_RAW: branch,
       commit_short: commitShort,
-      commit_raw: commitShort,
-      commit_url_value: commitUrl,
-      user_raw: actor,
-      user_url_value: userUrl,
-      status_raw: status,
-      msg_raw: commitMsg || 'No commit message',
-      title_raw: title,
-      detail_url_value: detailUrl,
+      COMMIT_RAW: commitShort,
+      'COMMIT__URL': commitUrl,
+      USER_RAW: actor,
+      'USER__URL': userUrl,
+      STATUS_RAW: status,
+      MSG_RAW: commitMsg || 'No commit message',
+      TITLE_RAW: title,
+      DETAIL_URL: detailUrl,
       workflow: workflow,
       run_id: runId,
     }
